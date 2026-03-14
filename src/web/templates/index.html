@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能老人远程监护系统</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        .header h1 { font-size: 28px; margin-bottom: 10px; }
+        .status-bar {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        .status-item { display: flex; align-items: center; gap: 8px; }
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .status-indicator.online { background: #4ade80; }
+        .status-indicator.offline { background: #ef4444; animation: none; }
+        .status-indicator.warning { background: #f59e0b; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .main-container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .video-section {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .video-header {
+            padding: 15px 20px;
+            background: #0f3460;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .video-container {
+            position: relative;
+            background: #000;
+            aspect-ratio: 4/3;
+        }
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        .video-overlay {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+        .alert-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(220, 38, 38, 0.9);
+            padding: 20px 40px;
+            border-radius: 12px;
+            text-align: center;
+            display: none;
+            animation: alertPulse 1s infinite;
+        }
+        .alert-overlay.active { display: block; }
+        @keyframes alertPulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.05); }
+        }
+        .alert-overlay h2 { font-size: 24px; margin-bottom: 10px; }
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .panel {
+            background: #16213e;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .panel-header {
+            padding: 15px 20px;
+            background: #0f3460;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .panel-content { padding: 20px; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        .stat-card {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #4ade80;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+        .alert-list { max-height: 300px; overflow-y: auto; }
+        .alert-item {
+            background: #0f3460;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ef4444;
+        }
+        .alert-item.warning { border-left-color: #f59e0b; }
+        .alert-item.info { border-left-color: #3b82f6; }
+        .alert-time { font-size: 11px; color: #94a3b8; }
+        .alert-type { font-weight: 600; font-size: 13px; margin: 5px 0; }
+        .alert-message { font-size: 12px; color: #cbd5e1; }
+        .control-buttons { display: flex; gap: 10px; }
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-primary { background: #3b82f6; color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+        @media (max-width: 1024px) {
+            .main-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏠 智能老人远程监护系统</h1>
+        <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator online" id="system-status"></div>
+                <span id="system-status-text">系统运行中</span>
+            </div>
+            <div class="status-item">
+                <span>👥 当前人数: <strong id="person-count">0</strong></span>
+            </div>
+            <div class="status-item">
+                <span>🎥 FPS: <strong id="fps-counter">0</strong></span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="main-container">
+        <div class="video-section">
+            <div class="video-header">
+                <span>📹 实时监控</span>
+                <span id="recording-status" style="color: #ef4444;">● 录像中</span>
+            </div>
+            <div class="video-container">
+                <img src="/video_feed" alt="监控画面">
+                <div class="video-overlay">
+                    <div>检测状态: <span id="detection-status">正常</span></div>
+                    <div style="margin-top:5px">跌倒检测: <span id="fall-status">正常</span></div>
+                </div>
+                <div class="alert-overlay" id="alert-overlay">
+                    <h2>⚠️ 检测到异常</h2>
+                    <p id="alert-message">请立即查看!</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-header">📊 实时监控数据</div>
+                <div class="panel-content">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-detections">0</div>
+                            <div class="stat-label">今日检测</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-alerts">0</div>
+                            <div class="stat-label">今日报警</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-falls">0</div>
+                            <div class="stat-label">跌倒事件</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-uptime">0m</div>
+                            <div class="stat-label">运行时间</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-behaviors">0</div>
+                            <div class="stat-label">行为识别</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-current-behavior">-</div>
+                            <div class="stat-label">当前行为</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">🎛️ 系统控制</div>
+                <div class="panel-content">
+                    <div class="control-buttons">
+                        <button class="btn btn-success" onclick="startSystem()">▶ 启动</button>
+                        <button class="btn btn-danger" onclick="stopSystem()">⏹ 停止</button>
+                        <button class="btn btn-primary" onclick="restartSystem()">🔄 重启</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">🧍 行为识别状态</div>
+                <div class="panel-content">
+                    <div id="behavior-list" class="behavior-list">
+                        <div class="empty-state">暂无行为数据</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">🚨 最近报警</div>
+                <div class="panel-content">
+                    <div class="alert-list" id="alert-list">
+                        <div class="empty-state">暂无报警记录</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Socket.IO连接
+        const socket = io();
+        
+        // 状态更新
+        socket.on('status_update', (data) => {
+            updateStatus(data);
+        });
+        
+        // 报警接收
+        socket.on('alert', (data) => {
+            showAlert(data);
+            addAlertToList(data);
+        });
+        
+        // 连接状态
+        socket.on('connect', () => {
+            console.log('已连接到服务器');
+        });
+        
+        // 定期获取状态
+        setInterval(fetchStatus, 2000);
+        setInterval(fetchStats, 5000);
+        
+        // 获取系统状态
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/status');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus(data);
+                }
+            } catch (error) {
+                console.error('获取状态失败:', error);
+            }
+        }
+        
+        // 获取统计数据
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStats(data);
+                }
+            } catch (error) {
+                console.error('获取统计失败:', error);
+            }
+        }
+        
+        // 更新状态显示
+        function updateStatus(data) {
+            document.getElementById('person-count').textContent = data.person_count || 0;
+            document.getElementById('fps-counter').textContent = data.fps?.toFixed(1) || 0;
+            document.getElementById('detection-status').textContent = data.detection_active ? '运行中' : '暂停';
+            document.getElementById('fall-status').textContent = data.fall_detection_enabled ? '启用' : '禁用';
+            
+            const statusIndicator = document.getElementById('system-status');
+            const statusText = document.getElementById('system-status-text');
+            
+            if (data.is_running) {
+                statusIndicator.className = 'status-indicator online';
+                statusText.textContent = '系统运行中';
+            } else {
+                statusIndicator.className = 'status-indicator offline';
+                statusText.textContent = '系统已停止';
+            }
+        }
+        
+        // 更新统计数据
+        function updateStats(data) {
+            document.getElementById('stat-detections').textContent = data.today_detections || 0;
+            document.getElementById('stat-alerts').textContent = data.today_alerts || 0;
+            document.getElementById('stat-falls').textContent = data.total_falls || 0;
+            
+            if (data.behavior_stats) {
+                const tracked = data.behavior_stats.total_tracked || 0;
+                document.getElementById('stat-behaviors').textContent = tracked;
+            }
+            
+            const uptime = data.uptime || 0;
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            if (hours > 0) {
+                document.getElementById('stat-uptime').textContent = `${hours}h ${minutes}m`;
+            } else {
+                document.getElementById('stat-uptime').textContent = `${minutes}m`;
+            }
+        }
+        
+        // 显示报警弹窗
+        function showAlert(data) {
+            const overlay = document.getElementById('alert-overlay');
+            const message = document.getElementById('alert-message');
+            
+            message.textContent = data.message || '请立即查看!';
+            overlay.classList.add('active');
+            
+            setTimeout(() => {
+                overlay.classList.remove('active');
+            }, 5000);
+        }
+        
+        // 添加报警到列表
+        function addAlertToList(data) {
+            const list = document.getElementById('alert-list');
+            const emptyState = list.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+            
+            const alertItem = document.createElement('div');
+            alertItem.className = `alert-item ${data.level === 'WARNING' ? 'warning' : ''}`;
+            
+            const time = new Date(data.timestamp * 1000).toLocaleTimeString();
+            
+            alertItem.innerHTML = `
+                <div class="alert-time">${time}</div>
+                <div class="alert-type">${data.alert_type || '报警'}</div>
+                <div class="alert-message">${data.message}</div>
+            `;
+            
+            list.insertBefore(alertItem, list.firstChild);
+            
+            while (list.children.length > 10) {
+                list.removeChild(list.lastChild);
+            }
+        }
+        
+        // 系统控制
+        async function startSystem() {
+            await fetch('/api/control/start', { method: 'POST' });
+            fetchStatus();
+        }
+        
+        async function stopSystem() {
+            await fetch('/api/control/stop', { method: 'POST' });
+            fetchStatus();
+        }
+        
+        async function restartSystem() {
+            await fetch('/api/control/restart', { method: 'POST' });
+            setTimeout(fetchStatus, 2000);
+        }
+        
+        // 获取行为状态
+        async function fetchBehaviors() {
+            try {
+                const response = await fetch('/api/behaviors');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateBehaviorList(data);
+                }
+            } catch (error) {
+                console.error('获取行为状态失败:', error);
+            }
+        }
+        
+        // 更新行为列表显示
+        function updateBehaviorList(behaviors) {
+            const list = document.getElementById('behavior-list');
+            const behaviorIds = Object.keys(behaviors);
+            
+            if (behaviorIds.length === 0) {
+                list.innerHTML = '<div class="empty-state">暂无行为数据</div>';
+                document.getElementById('stat-current-behavior').textContent = '-';
+                return;
+            }
+            
+            let html = '';
+            let firstBehavior = null;
+            
+            behaviorIds.forEach((id, index) => {
+                const b = behaviors[id];
+                if (index === 0) firstBehavior = b;
+                
+                const behaviorColors = {
+                    '站立': '#4ade80',
+                    '坐下': '#3b82f6',
+                    '躺下': '#f59e0b',
+                    '行走': '#10b981',
+                    '吃饭': '#ec4899',
+                    '喝水': '#8b5cf6',
+                    '打电话': '#f97316',
+                    '举手': '#06b6d4',
+                    '跌倒': '#ef4444',
+                    '未知': '#64748b'
+                };
+                
+                const color = behaviorColors[b.current_behavior] || '#94a3b8';
+                const duration = b.duration ? `${b.duration.toFixed(0)}s` : '';
+                const confidence = b.confidence ? `${(b.confidence * 100).toFixed(0)}%` : '';
+                
+                html += `
+                    <div class="behavior-item" style="
+                        background: #0f3460;
+                        padding: 10px;
+                        border-radius: 8px;
+                        margin-bottom: 8px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
+                        <div>
+                            <div style="
+                                font-weight: 600;
+                                color: ${color};
+                                font-size: 14px;
+                            ">${b.current_behavior}</div>
+                            <div style="
+                                font-size: 11px;
+                                color: #94a3b8;
+                                margin-top: 2px;
+                            ">ID: ${b.track_id}</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="
+                                font-size: 12px;
+                                color: #4ade80;
+                            ">${confidence}</div>
+                            <div style="
+                                font-size: 11px;
+                                color: #64748b;
+                                margin-top: 2px;
+                            ">${duration}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            list.innerHTML = html;
+            
+            if (firstBehavior) {
+                document.getElementById('stat-current-behavior').textContent = firstBehavior.current_behavior;
+            }
+        }
+        
+        // 初始加载
+        fetchStatus();
+        fetchStats();
+        fetchBehaviors();
+    </script>
+</body>
+</html>
