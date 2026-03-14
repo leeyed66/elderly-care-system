@@ -1,0 +1,37 @@
+# 深度学习框架
+torch>=2.5.0
+torchvision>=0.20.0
+ultralytics>=8.2.0
+
+# 计算机视觉
+opencv-python>=4.9.0
+opencv-contrib-python>=4.9.0
+numpy>=2.1.0              # Python 3.13 需要 2.1.0+
+pillow>=10.1.0
+scipy>=1.14.0             # Python 3.13 需要 1.14.0+
+
+# Web框架
+flask>=3.0.0
+flask-socketio>=5.3.6
+flask-cors>=4.0.0
+eventlet>=0.35.0          # Python 3.13 需要 0.35.0+
+
+# 数据库
+sqlalchemy>=2.0.23
+
+# 消息推送
+requests>=2.31.0
+
+# 工具库
+pyyaml>=6.0.1
+python-dotenv>=1.0.0
+colorlog>=6.7.0
+tqdm>=4.66.1
+
+# 视频处理
+imageio>=2.31.1
+imageio-ffmpeg>=0.4.9
+
+# 开发工具
+pytest>=8.0.0
+black>=24.0.0
