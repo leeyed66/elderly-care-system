@@ -1,0 +1,117 @@
+# 智能老人监护系统配置文件
+
+# 系统配置
+system:
+  name: "Elderly Care Monitoring System"
+  version: "1.0.0"
+  debug: false
+  log_level: "INFO"
+  log_dir: "config/logs"
+
+# 视频源配置
+video:
+  source_type: "webcam"
+  source_path: 0
+  width: 640
+  height: 480
+  fps: 30
+  buffer_size: 10
+
+# YOLO模型配置
+yolo:
+  model_path: "yolov8n-pose.pt"
+  conf_threshold: 0.5
+  iou_threshold: 0.45
+  classes: [0]
+  device: "auto"
+  half: false
+  max_det: 10
+
+# 跌倒检测配置
+fall_detection:
+  enabled: true
+  method: "all"
+  height_threshold: 0.3
+  aspect_ratio_threshold: 1.0
+  angle_threshold: 60
+  consecutive_frames: 3
+  cooldown_time: 10
+
+# 长时间静止检测
+inactivity_detection:
+  enabled: true
+  threshold_seconds: 300
+  check_interval: 30
+  position_tolerance: 20
+
+# 区域入侵检测
+zone_detection:
+  enabled: false
+  danger_zones: []
+  safe_zones: []
+
+# 行为识别配置
+behavior_detection:
+  enabled: true
+  window_size: 5
+  confidence_threshold: 0.6
+  min_duration: 2.0
+  alert_on:
+    - "跌倒"
+    - "长时间躺卧"
+  long_lying_threshold: 1800
+
+# 报警配置
+alert:
+  local:
+    enabled: true
+    sound: true
+    sound_file: "config/sounds/alert.wav"
+    popup: true
+  push:
+    enabled: false
+    webhook_url: ""
+  email:
+    enabled: false
+    smtp_server: "smtp.qq.com"
+    smtp_port: 587
+    sender: ""
+    password: ""
+    receivers: []
+  sms:
+    enabled: false
+    provider: "aliyun"
+    access_key: ""
+    secret_key: ""
+    phone_numbers: []
+
+# Web界面配置
+web:
+  enabled: true
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+  secret_key: "your-secret-key-change-this"
+  stream_quality: 80
+  stream_fps: 15
+
+# 数据存储
+database:
+  type: "sqlite"
+  path: "config/data/monitoring.db"
+
+# 录像配置
+recording:
+  enabled: true
+  output_dir: "config/data/recordings"
+  format: "mp4"
+  codec: "mp4v"
+  segment_duration: 300
+  retention_days: 7
+
+# 性能优化
+performance:
+  skip_frames: 2
+  resize_factor: 0.5
+  use_threading: true
+  queue_size: 30
